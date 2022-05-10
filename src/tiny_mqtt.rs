@@ -1,16 +1,23 @@
-use embedded_nal::{SocketAddrV4, TcpClientStack};
-use esp_wifi::{compat::queue::SimpleQueue, println};
+use esp_println::println;
+use esp_wifi::{
+    compat::queue::SimpleQueue,
+    wifi_interface::{timestamp, WifiError},
+};
 use mqttrust::{
     encoding::v4::{decode_slice, encode_slice, Connect, Pid, Protocol},
     Mqtt, MqttError, Packet, Publish, QoS, Subscribe, SubscribeTopic,
 };
-use smoltcp::iface::SocketHandle;
+use smoltcp::{
+    iface::SocketHandle,
+    socket::{Socket, TcpSocket},
+    wire::Ipv4Address,
+};
 
 #[derive(Debug)]
 pub enum TinyMqttError {
     MqttError(MqttError),
-    Error(smoltcp_nal::Error),
-    NetworkError(smoltcp_nal::NetworkError),
+    Error(smoltcp::Error),
+    WifiError(WifiError),
 }
 
 impl From<MqttError> for TinyMqttError {
@@ -19,15 +26,15 @@ impl From<MqttError> for TinyMqttError {
     }
 }
 
-impl From<smoltcp_nal::Error> for TinyMqttError {
-    fn from(e: smoltcp_nal::Error) -> Self {
+impl From<smoltcp::Error> for TinyMqttError {
+    fn from(e: smoltcp::Error) -> Self {
         TinyMqttError::Error(e)
     }
 }
 
-impl From<smoltcp_nal::NetworkError> for TinyMqttError {
-    fn from(e: smoltcp_nal::NetworkError) -> Self {
-        TinyMqttError::NetworkError(e)
+impl From<WifiError> for TinyMqttError {
+    fn from(e: WifiError) -> Self {
+        TinyMqttError::WifiError(e)
     }
 }
 
@@ -51,7 +58,6 @@ impl PacketBuffer {
 pub struct TinyMqtt<'a> {
     client_id: &'a str,
     interface: esp_wifi::wifi_interface::Wifi<'a>,
-    socket: Option<SocketHandle>,
     queue: core::cell::RefCell<SimpleQueue<(usize, [u8; 1024]), 10>>,
     recv_buffer: [u8; 1024],
     recv_index: usize,
@@ -60,19 +66,32 @@ pub struct TinyMqtt<'a> {
     last_sent_millis: u32,
     current_millis_fn: fn() -> u32,
     receive_callback: Option<&'a dyn Fn(&str, &[u8])>,
+    mqtt_socket_handle: SocketHandle,
+    local_port: u16,
 }
 
 impl<'a> TinyMqtt<'a> {
     pub fn new(
         client_id: &'a str,
-        interface: esp_wifi::wifi_interface::Wifi<'a>,
+        mut interface: esp_wifi::wifi_interface::Wifi<'a>,
         current_millis_fn: fn() -> u32,
         receive_callback: Option<&'a dyn Fn(&str, &[u8])>,
     ) -> TinyMqtt<'a> {
+        let mut mqtt_socket_handle: Option<SocketHandle> = None;
+
+        for (handle, socket) in interface.network_interface().sockets_mut() {
+            match socket {
+                Socket::Tcp(_) => {
+                    mqtt_socket_handle = Some(handle);
+                    break;
+                }
+                _ => {}
+            }
+        }
+
         let res = TinyMqtt {
             client_id,
             interface,
-            socket: None,
             queue: core::cell::RefCell::new(SimpleQueue::new()),
             recv_buffer: [0u8; 1024],
             recv_index: 0,
@@ -81,6 +100,8 @@ impl<'a> TinyMqtt<'a> {
             last_sent_millis: 0,
             current_millis_fn,
             receive_callback,
+            mqtt_socket_handle: mqtt_socket_handle.unwrap(),
+            local_port: 41000,
         };
 
         res
@@ -88,23 +109,37 @@ impl<'a> TinyMqtt<'a> {
 
     pub fn connect(
         &mut self,
-        addr: SocketAddrV4,
+        addr: Ipv4Address,
+        port: u16,
         keep_alive_secs: u16,
         username: Option<&'a str>,
         password: Option<&'a [u8]>,
     ) -> Result<(), TinyMqttError> {
         self.timeout_secs = keep_alive_secs;
 
-        let mut sock = self.interface.network_stack().socket().unwrap();
-        self.interface
-            .network_stack()
-            .connect(&mut sock, addr.into())
-            .unwrap();
+        {
+            let (sock, cx) = self
+                .interface
+                .network_interface()
+                .get_socket_and_context::<TcpSocket>(self.mqtt_socket_handle);
+            let remote_endpoint = (addr, port);
+            sock.connect(cx, remote_endpoint, self.local_port)?;
+            self.local_port += 1;
+            if self.local_port == 65535 {
+                self.local_port = 41000;
+            }
+        }
 
-        self.wait_for_socket_connected(&mut sock)?;
-        println!("socket = {:?}", sock);
-
-        self.socket = Some(sock);
+        loop {
+            let sock = self
+                .interface
+                .network_interface()
+                .get_socket::<TcpSocket>(self.mqtt_socket_handle);
+            if sock.can_send() {
+                break;
+            }
+            self.work();
+        }
 
         let connect = Packet::Connect(Connect {
             protocol: Protocol::MQTT311,
@@ -134,20 +169,10 @@ impl<'a> TinyMqtt<'a> {
     }
 
     pub fn disconnect(&mut self) -> Result<(), TinyMqttError> {
-        match self.socket {
-            Some(socket) => {
-                self.interface.network_stack().close(socket)?;
-                Ok(())
-            }
-            None => Ok(()),
-        }
-    }
-
-    fn wait_for_socket_connected(&mut self, sock: &mut SocketHandle) -> Result<(), TinyMqttError> {
-        while !self.interface.network_stack().is_connected(sock).unwrap() {
-            self.interface.network_stack().poll()?;
-        }
-
+        self.interface
+            .network_interface()
+            .get_socket::<TcpSocket>(self.mqtt_socket_handle)
+            .abort();
         Ok(())
     }
 
@@ -231,11 +256,12 @@ impl<'a> TinyMqtt<'a> {
             self.work();
 
             let mut buffer = [0u8; 1024];
-            match self
+            let socket = self
                 .interface
-                .network_stack()
-                .receive(&mut self.socket.unwrap(), &mut buffer)
-            {
+                .network_interface()
+                .get_socket::<TcpSocket>(self.mqtt_socket_handle);
+
+            match socket.recv_slice(&mut buffer) {
                 Ok(len) => {
                     if len > 0 {
                         println!("got {} bytes: {:02x?}", len, &buffer[..len]);
@@ -259,10 +285,7 @@ impl<'a> TinyMqtt<'a> {
                         return Ok(());
                     }
                 }
-                Err(nb::Error::WouldBlock) => {
-                    // nothing ... just try again
-                }
-                Err(nb::Error::Other(e)) => {
+                Err(e) => {
                     println!("recv error {:?}", e);
                     return Err(e.into());
                 }
@@ -278,12 +301,13 @@ impl<'a> TinyMqtt<'a> {
                     self.work();
 
                     println!("try sending a buffer, len = {}", len);
-                    if self
+
+                    let socket = self
                         .interface
-                        .network_stack()
-                        .send(&mut self.socket.unwrap(), &buffer[..len])
-                        .is_ok()
-                    {
+                        .network_interface()
+                        .get_socket::<TcpSocket>(self.mqtt_socket_handle);
+
+                    if socket.send_slice(&buffer[..len]).is_ok() {
                         println!("fine");
                         return Ok(());
                     }
@@ -295,7 +319,8 @@ impl<'a> TinyMqtt<'a> {
 
     fn work(&mut self) {
         loop {
-            if let Ok(false) = self.interface.network_stack().poll() {
+            self.interface.poll_dhcp().ok();
+            if let Ok(false) = self.interface.network_interface().poll(timestamp()) {
                 break;
             }
         }

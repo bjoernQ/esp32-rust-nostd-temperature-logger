@@ -2,8 +2,6 @@
 #![no_main]
 
 use alloc::format;
-use embedded_nal::Ipv4Addr;
-use embedded_nal::SocketAddrV4;
 use embedded_svc::wifi::ClientConnectionStatus;
 use embedded_svc::wifi::ClientIpStatus;
 use embedded_svc::wifi::{ClientConfiguration, ClientStatus, Configuration, Status, Wifi};
@@ -11,14 +9,17 @@ use esp32_hal::i2c::I2C;
 use esp32_hal::pac::Peripherals;
 use esp32_hal::RtcCntl;
 use esp32_hal::IO;
+use esp_backtrace as _;
+use esp_println::println;
 use esp_wifi::create_network_stack_storage;
 use esp_wifi::network_stack_storage;
 use esp_wifi::wifi::initialize;
-use esp_wifi::wifi::utils::create_network_stack;
-use esp_wifi::{println, Uart};
+use esp_wifi::wifi::utils::create_network_interface;
 
+use esp_wifi::wifi_interface::timestamp;
 use mqttrust::encoding::v4::Pid;
 
+use smoltcp::wire::Ipv4Address;
 use xtensa_lx_rt::entry;
 
 use crate::bmp180::Bmp180;
@@ -46,7 +47,7 @@ fn main() -> ! {
     rtc_cntl.set_wdt_global_enable(false);
 
     let mut storage = create_network_stack_storage!(3, 8, 1);
-    let network_stack = create_network_stack(network_stack_storage!(storage));
+    let network_stack = create_network_interface(network_stack_storage!(storage));
 
     let mut wifi_interface = esp_wifi::wifi_interface::Wifi::new(network_stack);
 
@@ -80,9 +81,23 @@ fn main() -> ! {
     let res = wifi_interface.set_configuration(&client_config);
     println!("wifi_connect returned {:?}", res);
 
+    // wait to get connected
+    loop {
+        if let Status(ClientStatus::Started(_), _) = wifi_interface.get_status() {
+            break;
+        }
+    }
+    println!("{:?}", wifi_interface.get_status());
+
     // wait to get connected and have an ip
     loop {
-        wifi_interface.network_stack().poll().unwrap();
+        wifi_interface.poll_dhcp().unwrap();
+
+        wifi_interface
+            .network_interface()
+            .poll(timestamp())
+            .unwrap();
+
         if let Status(
             ClientStatus::Started(ClientConnectionStatus::Connected(ClientIpStatus::Done(config))),
             _,
@@ -100,12 +115,18 @@ fn main() -> ! {
 
     let mut last_sent_millis = 0;
     loop {
-        if mqtt.connect(
-            SocketAddrV4::new(Ipv4Addr::new(52, 54, 163, 195), 1883), // io.adafruit.com:1883
+        println!("Trying to connect");
+        if let Err(e) = mqtt.connect(
+            Ipv4Address::new(52, 54, 163, 195), // io.adafruit.com
+            1883,
             10,
             Some(ADAFRUIT_IO_USERNAME),
             Some(ADAFRUIT_IO_KEY.as_bytes()),
-        ).is_err() {
+        ) {
+            println!(
+                "Something went wrong ... retrying in 10 seconds. Error is {:?}",
+                e
+            );
             // wait a bit and try it again
             sleep_millis(10_000);
             continue;
@@ -144,6 +165,7 @@ fn main() -> ! {
             }
         }
 
+        println!("Disconnecting");
         mqtt.disconnect().ok();
     }
 }
@@ -179,10 +201,4 @@ impl log::Log for SimpleLogger {
     }
 
     fn flush(&self) {}
-}
-
-#[panic_handler]
-fn panic_handler(info: &core::panic::PanicInfo) -> ! {
-    println!("{}", info);
-    loop {}
 }
