@@ -5,8 +5,11 @@ use alloc::format;
 use embedded_svc::wifi::ClientConnectionStatus;
 use embedded_svc::wifi::ClientIpStatus;
 use embedded_svc::wifi::{ClientConfiguration, ClientStatus, Configuration, Status, Wifi};
+use esp32_hal::clock::ClockControl;
 use esp32_hal::i2c::I2C;
 use esp32_hal::pac::Peripherals;
+use esp32_hal::prelude::SystemExt;
+use esp32_hal::prelude::_fugit_RateExtU32;
 use esp32_hal::RtcCntl;
 use esp32_hal::IO;
 use esp_backtrace as _;
@@ -39,7 +42,12 @@ const INTERVALL_MS: u32 = 1 * 60 * 1000; // 1 minute intervall
 
 #[entry]
 fn main() -> ! {
-    let mut peripherals = Peripherals::take().unwrap();
+    init_logger();
+    esp_wifi::init_heap();
+
+    let peripherals = Peripherals::take().unwrap();
+    let mut system = peripherals.DPORT.split();
+    let mut clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
 
@@ -51,9 +59,7 @@ fn main() -> ! {
 
     let mut wifi_interface = esp_wifi::wifi_interface::Wifi::new(network_stack);
 
-    initialize(peripherals.TIMG1, peripherals.RNG).ok();
-
-    init_logger();
+    initialize(peripherals.TIMG1, peripherals.RNG, &clocks).ok();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -63,8 +69,9 @@ fn main() -> ! {
         peripherals.I2C0,
         io.pins.gpio32,
         io.pins.gpio33,
-        50_000, // should be 100_000 but the HAL currently doesn't account for changed clocks
-        &mut peripherals.DPORT,
+        100u32.kHz(), // should be 100_000 but the HAL currently doesn't account for changed clocks
+        &mut system.peripheral_clock_control,
+        &mut clocks,
     )
     .unwrap();
 
