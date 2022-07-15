@@ -284,7 +284,7 @@ dependencies = [
 [[package]]
 name = "esp-hal-common"
 version = "0.1.0"
-source = "git+https://github.com/esp-rs/esp-hal.git#b69423451f14a9276cae7d4bb6e45eeed3ac231e"
+source = "git+https://github.com/esp-rs/esp-hal.git?rev=907d43ed6f2bfde73763f9465b3e044c7777fee6#907d43ed6f2bfde73763f9465b3e044c7777fee6"
 dependencies = [
  "cfg-if",
  "embedded-hal 0.2.7",
@@ -302,7 +302,7 @@ dependencies = [
 [[package]]
 name = "esp-hal-procmacros"
 version = "0.1.0"
-source = "git+https://github.com/esp-rs/esp-hal.git#b69423451f14a9276cae7d4bb6e45eeed3ac231e"
+source = "git+https://github.com/esp-rs/esp-hal.git?rev=907d43ed6f2bfde73763f9465b3e044c7777fee6#907d43ed6f2bfde73763f9465b3e044c7777fee6"
 dependencies = [
  "darling 0.14.1",
  "proc-macro-error",
@@ -313,14 +313,14 @@ dependencies = [
 
 [[package]]
 name = "esp-println"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c2458aae7da5fbc99416eb3490dcf6e8c6f1bc252bfe51251e20e4a59802631"
+checksum = "0e85a29fdc9c7059d7f95ce47d90b0ca4955599d6af3b2afb38328b2b6f326ab"
 
 [[package]]
 name = "esp-wifi"
 version = "0.1.0"
-source = "git+https://github.com/esp-rs/esp-wifi.git#a71d3c21f6f41da67aff6d1625edcf5070ee2a2b"
+source = "git+https://github.com/esp-rs/esp-wifi.git#9759aa46f2b1ea8c8ed1951239916d1c96286a88"
 dependencies = [
  "atomic-polyfill",
  "critical-section",
@@ -343,7 +343,7 @@ dependencies = [
 [[package]]
 name = "esp32"
 version = "0.12.0"
-source = "git+https://github.com/esp-rs/esp-pacs.git?branch=with_source#f5905f30f4796ed4da8fe333b6ed9700901c515b"
+source = "git+https://github.com/esp-rs/esp-pacs.git?rev=f5905f30f4796ed4da8fe333b6ed9700901c515b#f5905f30f4796ed4da8fe333b6ed9700901c515b"
 dependencies = [
  "bare-metal 1.0.0",
  "vcell",
@@ -354,7 +354,7 @@ dependencies = [
 [[package]]
 name = "esp32-hal"
 version = "0.1.0"
-source = "git+https://github.com/esp-rs/esp-hal.git#b69423451f14a9276cae7d4bb6e45eeed3ac231e"
+source = "git+https://github.com/esp-rs/esp-hal.git?rev=907d43ed6f2bfde73763f9465b3e044c7777fee6#907d43ed6f2bfde73763f9465b3e044c7777fee6"
 dependencies = [
  "bare-metal 1.0.0",
  "embedded-hal 0.2.7",
@@ -743,9 +743,9 @@ dependencies = [
 
 [[package]]
 name = "spin"
-version = "0.9.3"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c530c2b0d0bf8b69304b39fe2001993e267461948b890cd037d8ad4293fa1a0d"
+checksum = "7f6002a767bff9e83f8eeecf883ecb8011875a21ae8da43bffb817a57e78cc09"
 dependencies = [
  "lock_api",
 ]
