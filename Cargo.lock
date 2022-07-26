@@ -66,12 +66,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
-name = "bytemuck"
-version = "1.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c53dfa917ec274df8ed3c572698f381a24eef2efba9492d797301b72b6db408a"
-
-[[package]]
 name = "byteorder"
 version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -275,7 +269,7 @@ dependencies = [
 [[package]]
 name = "esp-backtrace"
 version = "0.1.0"
-source = "git+https://github.com/esp-rs/esp-backtrace.git#21b1587370827fb2debc8fbbe624e1fbe29b5fb9"
+source = "git+https://github.com/esp-rs/esp-backtrace.git#df3d97af95dce9d2967cd776249f97d206d7b6c3"
 dependencies = [
  "esp-println",
  "xtensa-lx-rt",
@@ -284,7 +278,7 @@ dependencies = [
 [[package]]
 name = "esp-hal-common"
 version = "0.1.0"
-source = "git+https://github.com/esp-rs/esp-hal.git?rev=907d43ed6f2bfde73763f9465b3e044c7777fee6#907d43ed6f2bfde73763f9465b3e044c7777fee6"
+source = "git+https://github.com/esp-rs/esp-hal.git#1789780d069f179bd10c3ed60dc716826f54a046"
 dependencies = [
  "cfg-if",
  "embedded-hal 0.2.7",
@@ -293,7 +287,6 @@ dependencies = [
  "fugit",
  "nb 1.0.0",
  "paste",
- "smart-leds-trait",
  "void",
  "xtensa-lx",
  "xtensa-lx-rt",
@@ -302,7 +295,7 @@ dependencies = [
 [[package]]
 name = "esp-hal-procmacros"
 version = "0.1.0"
-source = "git+https://github.com/esp-rs/esp-hal.git?rev=907d43ed6f2bfde73763f9465b3e044c7777fee6#907d43ed6f2bfde73763f9465b3e044c7777fee6"
+source = "git+https://github.com/esp-rs/esp-hal.git#1789780d069f179bd10c3ed60dc716826f54a046"
 dependencies = [
  "darling 0.14.1",
  "proc-macro-error",
@@ -320,7 +313,7 @@ checksum = "0e85a29fdc9c7059d7f95ce47d90b0ca4955599d6af3b2afb38328b2b6f326ab"
 [[package]]
 name = "esp-wifi"
 version = "0.1.0"
-source = "git+https://github.com/esp-rs/esp-wifi.git#9759aa46f2b1ea8c8ed1951239916d1c96286a88"
+source = "git+https://github.com/esp-rs/esp-wifi.git#3eb774172e6682cf2228b59ef7b7798954a03b79"
 dependencies = [
  "atomic-polyfill",
  "critical-section",
@@ -343,7 +336,7 @@ dependencies = [
 [[package]]
 name = "esp32"
 version = "0.12.0"
-source = "git+https://github.com/esp-rs/esp-pacs.git?rev=f5905f30f4796ed4da8fe333b6ed9700901c515b#f5905f30f4796ed4da8fe333b6ed9700901c515b"
+source = "git+https://github.com/esp-rs/esp-pacs.git?branch=with_source#a014abd300b547eec297ce122a46a3f5ea9070c8"
 dependencies = [
  "bare-metal 1.0.0",
  "vcell",
@@ -354,7 +347,7 @@ dependencies = [
 [[package]]
 name = "esp32-hal"
 version = "0.1.0"
-source = "git+https://github.com/esp-rs/esp-hal.git?rev=907d43ed6f2bfde73763f9465b3e044c7777fee6#907d43ed6f2bfde73763f9465b3e044c7777fee6"
+source = "git+https://github.com/esp-rs/esp-hal.git#1789780d069f179bd10c3ed60dc716826f54a046"
 dependencies = [
  "bare-metal 1.0.0",
  "embedded-hal 0.2.7",
@@ -570,9 +563,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.40"
+version = "1.0.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd96a1e8ed2596c337f8eae5f24924ec83f5ad5ab21ea8e455d3566c69fbcaf7"
+checksum = "c278e965f1d8cf32d6e0e96de3d3e79712178ae67986d9cf9151f51e95aac89b"
 dependencies = [
  "unicode-ident",
 ]
@@ -608,15 +601,6 @@ name = "regex-syntax"
 version = "0.6.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3f87b73ce11b1619a3c6332f45341e0047173771e8b8b73f87bfeefb7b56244"
-
-[[package]]
-name = "rgb"
-version = "0.8.33"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3b221de559e4a29df3b957eec92bc0de6bc8eaf6ca9cfed43e5e1d67ff65a34"
-dependencies = [
- "bytemuck",
-]
 
 [[package]]
 name = "riscv"
@@ -670,9 +654,9 @@ dependencies = [
 
 [[package]]
 name = "rustversion"
-version = "1.0.7"
+version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0a5f7c728f5d284929a1cccb5bc19884422bfe6ef4d6c409da2c41838983fcf"
+checksum = "24c8ad4f0c00e1eb5bc7614d236a7f1300e3dbd76b68cac8e06fb00b015ad8d8"
 
 [[package]]
 name = "scopeguard"
@@ -703,31 +687,22 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "serde"
-version = "1.0.139"
+version = "1.0.140"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0171ebb889e45aa68b44aee0859b3eede84c6f5f5c228e6f140c0b2a0a46cad6"
+checksum = "fc855a42c7967b7c369eb5860f7164ef1f6f81c20c7cc1141f2a604e18723b03"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.139"
+version = "1.0.140"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc1d3230c1de7932af58ad8ffbe1d784bd55efd5a9d84ac24f69c72d83543dfb"
+checksum = "6f2122636b9fe3b81f1cb25099fcf2d3f542cdb1d45940d56c713158884a05da"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "smart-leds-trait"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebf6d833fa93f16a1c1874e62c2aebe8567e5bdd436d59bf543ed258b6f7a8e3"
-dependencies = [
- "rgb",
 ]
 
 [[package]]
@@ -803,9 +778,9 @@ dependencies = [
 
 [[package]]
 name = "unicode-ident"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5bd2fe26506023ed7b5e1e315add59d6f584c621d037f9368fea9cfb988f368c"
+checksum = "15c61ba63f9235225a22310255a29b806b907c9b8c964bcbd0a2c70f3f2deea7"
 
 [[package]]
 name = "vcell"
@@ -848,9 +823,9 @@ dependencies = [
 
 [[package]]
 name = "xtensa-lx-rt"
-version = "0.12.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "270bff4d57a61dc54ebd5a61afa5399f709362795cdd0850da4621d48e9f91d9"
+checksum = "33a17a83d25998da4f2dca85afb6456ea340d3bde0211bebac011eb45dcbd2f4"
 dependencies = [
  "bare-metal 1.0.0",
  "core-isa-parser",
