@@ -258,7 +258,8 @@ dependencies = [
 [[package]]
 name = "esp-alloc"
 version = "0.1.0"
-source = "git+https://github.com/esp-rs/esp-alloc?rev=ccc849b#ccc849bcb512c2f17e6f743f85b4c75a69c4f59e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "747141836aa66f690bb8434f7044781b629c686fa699581aa3940f1b8ffee4ea"
 dependencies = [
  "bare-metal 1.0.0",
  "linked_list_allocator",
@@ -269,7 +270,7 @@ dependencies = [
 [[package]]
 name = "esp-backtrace"
 version = "0.1.0"
-source = "git+https://github.com/esp-rs/esp-backtrace.git#df3d97af95dce9d2967cd776249f97d206d7b6c3"
+source = "git+https://github.com/esp-rs/esp-backtrace.git#f01ab91682f8f71b11328bc4a1b372a2c3fa6ad7"
 dependencies = [
  "esp-println",
  "xtensa-lx-rt",
@@ -278,7 +279,7 @@ dependencies = [
 [[package]]
 name = "esp-hal-common"
 version = "0.1.0"
-source = "git+https://github.com/esp-rs/esp-hal.git#1789780d069f179bd10c3ed60dc716826f54a046"
+source = "git+https://github.com/esp-rs/esp-hal.git#224e84d9dcbf286431375b62cc2ec1b0a47272d8"
 dependencies = [
  "cfg-if",
  "embedded-hal 0.2.7",
@@ -295,7 +296,7 @@ dependencies = [
 [[package]]
 name = "esp-hal-procmacros"
 version = "0.1.0"
-source = "git+https://github.com/esp-rs/esp-hal.git#1789780d069f179bd10c3ed60dc716826f54a046"
+source = "git+https://github.com/esp-rs/esp-hal.git#224e84d9dcbf286431375b62cc2ec1b0a47272d8"
 dependencies = [
  "darling 0.14.1",
  "proc-macro-error",
@@ -313,7 +314,7 @@ checksum = "0e85a29fdc9c7059d7f95ce47d90b0ca4955599d6af3b2afb38328b2b6f326ab"
 [[package]]
 name = "esp-wifi"
 version = "0.1.0"
-source = "git+https://github.com/esp-rs/esp-wifi.git#3eb774172e6682cf2228b59ef7b7798954a03b79"
+source = "git+https://github.com/esp-rs/esp-wifi.git#6ec8e4d7b7f81ee8867e3b05f49633dfeea8b24b"
 dependencies = [
  "atomic-polyfill",
  "critical-section",
@@ -347,7 +348,7 @@ dependencies = [
 [[package]]
 name = "esp32-hal"
 version = "0.1.0"
-source = "git+https://github.com/esp-rs/esp-hal.git#1789780d069f179bd10c3ed60dc716826f54a046"
+source = "git+https://github.com/esp-rs/esp-hal.git#224e84d9dcbf286431375b62cc2ec1b0a47272d8"
 dependencies = [
  "bare-metal 1.0.0",
  "embedded-hal 0.2.7",
@@ -373,6 +374,7 @@ dependencies = [
  "nb 1.0.0",
  "panic-halt",
  "smoltcp",
+ "xtensa-lx",
  "xtensa-lx-rt",
 ]
 

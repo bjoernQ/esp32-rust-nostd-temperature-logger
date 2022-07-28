@@ -63,8 +63,8 @@ pub struct TinyMqtt<'a> {
     recv_index: usize,
     recv_queue: core::cell::RefCell<SimpleQueue<PacketBuffer, 10>>,
     timeout_secs: u16,
-    last_sent_millis: u32,
-    current_millis_fn: fn() -> u32,
+    last_sent_millis: u64,
+    current_millis_fn: fn() -> u64,
     receive_callback: Option<&'a dyn Fn(&str, &[u8])>,
     mqtt_socket_handle: SocketHandle,
     local_port: u16,
@@ -74,7 +74,7 @@ impl<'a> TinyMqtt<'a> {
     pub fn new(
         client_id: &'a str,
         mut interface: esp_wifi::wifi_interface::Wifi<'a>,
-        current_millis_fn: fn() -> u32,
+        current_millis_fn: fn() -> u64,
         receive_callback: Option<&'a dyn Fn(&str, &[u8])>,
     ) -> TinyMqtt<'a> {
         let mut mqtt_socket_handle: Option<SocketHandle> = None;
@@ -228,7 +228,7 @@ impl<'a> TinyMqtt<'a> {
     fn poll_internal(&mut self, drain_receive_queue: bool) -> Result<(), TinyMqttError> {
         let time = (self.current_millis_fn)();
 
-        if time > self.last_sent_millis + ((self.timeout_secs as u32 / 2) * 1000) {
+        if time > self.last_sent_millis + ((self.timeout_secs as u64 / 2) * 1000) {
             // ping
             self.send(Packet::Pingreq)?;
             self.last_sent_millis = (self.current_millis_fn)();

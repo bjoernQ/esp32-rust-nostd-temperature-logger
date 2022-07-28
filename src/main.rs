@@ -6,10 +6,12 @@ use embedded_svc::wifi::ClientConnectionStatus;
 use embedded_svc::wifi::ClientIpStatus;
 use embedded_svc::wifi::{ClientConfiguration, ClientStatus, Configuration, Status, Wifi};
 use esp32_hal::clock::ClockControl;
+use esp32_hal::clock::CpuClock;
 use esp32_hal::i2c::I2C;
 use esp32_hal::pac::Peripherals;
 use esp32_hal::prelude::SystemExt;
 use esp32_hal::prelude::_fugit_RateExtU32;
+use esp32_hal::timer::TimerGroup;
 use esp32_hal::RtcCntl;
 use esp32_hal::IO;
 use esp_backtrace as _;
@@ -38,7 +40,7 @@ const PASSWORD: &str = env!("PASSWORD");
 const ADAFRUIT_IO_USERNAME: &str = env!("ADAFRUIT_IO_USERNAME");
 const ADAFRUIT_IO_KEY: &str = env!("ADAFRUIT_IO_KEY");
 
-const INTERVALL_MS: u32 = 1 * 60 * 1000; // 1 minute intervall
+const INTERVALL_MS: u64 = 1 * 60 * 1000; // 1 minute intervall
 
 #[entry]
 fn main() -> ! {
@@ -47,7 +49,7 @@ fn main() -> ! {
 
     let peripherals = Peripherals::take().unwrap();
     let mut system = peripherals.DPORT.split();
-    let mut clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let clocks = ClockControl::configure(system.clock_control, CpuClock::Clock240MHz).freeze();
 
     let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
 
@@ -59,7 +61,8 @@ fn main() -> ! {
 
     let mut wifi_interface = esp_wifi::wifi_interface::Wifi::new(network_stack);
 
-    initialize(peripherals.TIMG1, peripherals.RNG, &clocks).ok();
+    let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
+    initialize(timg1.timer0, peripherals.RNG, &clocks).ok();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -69,12 +72,13 @@ fn main() -> ! {
         peripherals.I2C0,
         io.pins.gpio32,
         io.pins.gpio33,
-        100u32.kHz(), // should be 100_000 but the HAL currently doesn't account for changed clocks
+        100u32.kHz(),
         &mut system.peripheral_clock_control,
-        &mut clocks,
+        &clocks,
     )
     .unwrap();
 
+    println!("Measuring");
     let mut bmp180 = Bmp180::new(i2c, sleep_millis);
     bmp180.measure();
     println!("Current temperature {}", bmp180.get_temperature());
@@ -121,8 +125,11 @@ fn main() -> ! {
     let mut mqtt = TinyMqtt::new("esp32", wifi_interface, current_millis, None);
 
     let mut last_sent_millis = 0;
+    let mut first_msg_sent = false;
     loop {
+        sleep_millis(1_000);
         println!("Trying to connect");
+        mqtt.disconnect().ok();
         if let Err(e) = mqtt.connect(
             Ipv4Address::new(52, 54, 163, 195), // io.adafruit.com
             1883,
@@ -149,7 +156,9 @@ fn main() -> ! {
                 break;
             }
 
-            if current_millis() > last_sent_millis + INTERVALL_MS {
+            if current_millis() > last_sent_millis + INTERVALL_MS || !first_msg_sent {
+                first_msg_sent = true;
+
                 bmp180.measure();
                 let temperature: f32 = bmp180.get_temperature();
 
@@ -177,12 +186,12 @@ fn main() -> ! {
     }
 }
 
-pub fn current_millis() -> u32 {
-    (esp_wifi::timer::get_systimer_count() * 1000 / esp_wifi::timer::TICKS_PER_SECOND) as u32
+pub fn current_millis() -> u64 {
+    esp_wifi::timer::get_systimer_count() * 1_000 / esp_wifi::timer::TICKS_PER_SECOND
 }
 
 pub fn sleep_millis(delay: u32) {
-    let sleep_end = current_millis() + delay;
+    let sleep_end = current_millis() + delay as u64;
     while current_millis() < sleep_end {
         // wait
     }
