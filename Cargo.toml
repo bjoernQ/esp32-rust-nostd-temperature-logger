@@ -23,6 +23,7 @@ nb = "1.0.0"
 embedded-hal = "0.2"
 esp-println = { version = "0.2.0", features = [ "esp32" ] }
 esp-backtrace = { git = "https://github.com/esp-rs/esp-backtrace.git", features = [ "esp32", "panic-handler" ] }
+embedded-io = "0.3.0"
 
 [features]
 default = ["rt"]

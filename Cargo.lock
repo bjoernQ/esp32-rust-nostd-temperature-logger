@@ -365,6 +365,7 @@ name = "esp32_nostd_mqtt"
 version = "0.1.0"
 dependencies = [
  "embedded-hal 0.2.7",
+ "embedded-io",
  "embedded-svc",
  "esp-backtrace",
  "esp-println",
