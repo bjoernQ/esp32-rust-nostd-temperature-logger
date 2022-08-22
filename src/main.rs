@@ -2,6 +2,7 @@
 #![no_main]
 
 use alloc::format;
+use embedded_hal::watchdog::WatchdogDisable;
 use embedded_svc::wifi::ClientConnectionStatus;
 use embedded_svc::wifi::ClientIpStatus;
 use embedded_svc::wifi::{ClientConfiguration, ClientStatus, Configuration, Status, Wifi};
@@ -12,7 +13,7 @@ use esp32_hal::pac::Peripherals;
 use esp32_hal::prelude::SystemExt;
 use esp32_hal::prelude::_fugit_RateExtU32;
 use esp32_hal::timer::TimerGroup;
-use esp32_hal::RtcCntl;
+use esp32_hal::Rtc;
 use esp32_hal::IO;
 use esp_backtrace as _;
 use esp_println::println;
@@ -51,10 +52,8 @@ fn main() -> ! {
     let mut system = peripherals.DPORT.split();
     let clocks = ClockControl::configure(system.clock_control, CpuClock::Clock240MHz).freeze();
 
-    let mut rtc_cntl = RtcCntl::new(peripherals.RTC_CNTL);
-
-    // Disable MWDT and RWDT (Watchdog) flash boot protection
-    rtc_cntl.set_wdt_global_enable(false);
+    let mut rtc_cntl = Rtc::new(peripherals.RTC_CNTL);
+    rtc_cntl.rwdt.disable();
 
     let mut storage = create_network_stack_storage!(3, 8, 1);
     let network_stack = create_network_interface(network_stack_storage!(storage));
