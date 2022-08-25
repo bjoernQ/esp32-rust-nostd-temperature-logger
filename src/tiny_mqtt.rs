@@ -51,7 +51,7 @@ impl PacketBuffer {
 
 pub struct TinyMqtt<'a> {
     client_id: &'a str,
-    socket: crate::Socket<'a, 'a>,
+    socket: crate::socket::Socket<'a, 'a>,
     queue: core::cell::RefCell<SimpleQueue<(usize, [u8; 1024]), 10>>,
     recv_buffer: [u8; 1024],
     recv_index: usize,
@@ -65,7 +65,7 @@ pub struct TinyMqtt<'a> {
 impl<'a> TinyMqtt<'a> {
     pub fn new(
         client_id: &'a str,
-        socket: crate::Socket<'a, 'a>,
+        socket: crate::socket::Socket<'a, 'a>,
         current_millis_fn: fn() -> u64,
         receive_callback: Option<&'a dyn Fn(&str, &[u8])>,
     ) -> TinyMqtt<'a> {
