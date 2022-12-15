@@ -43,10 +43,6 @@ const INTERVALL_MS: u64 = 1 * 60 * 1000; // 1 minute intervall
 
 #[entry]
 fn main() -> ! {
-    // unsafe {
-    //     xtensa_lx::interrupt::disable();
-    // }
-
     esp_wifi::init_heap();
     init_logger();
 
