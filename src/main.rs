@@ -1,42 +1,37 @@
 #![no_std]
 #![no_main]
 
-use alloc::format;
+use core::fmt::Write;
+
 use embedded_hal::watchdog::WatchdogDisable;
 
-use embedded_svc::wifi::ClientConnectionStatus;
-use embedded_svc::wifi::ClientIpStatus;
-use embedded_svc::wifi::{ClientConfiguration, ClientStatus, Configuration, Status, Wifi};
+use embedded_svc::ipv4::Interface;
+use embedded_svc::wifi::{ClientConfiguration, Configuration, Wifi};
 use esp32_hal::clock::ClockControl;
 use esp32_hal::clock::CpuClock;
 use esp32_hal::i2c::I2C;
 use esp32_hal::pac::Peripherals;
-use esp32_hal::prelude::SystemExt;
 use esp32_hal::prelude::_fugit_RateExtU32;
+use esp32_hal::prelude::*;
 use esp32_hal::timer::TimerGroup;
 use esp32_hal::Rtc;
 use esp32_hal::IO;
 use esp_backtrace as _;
 use esp_println::println;
 use esp_wifi::create_network_stack_storage;
+use esp_wifi::initialize;
 use esp_wifi::network_stack_storage;
-use esp_wifi::wifi::initialize;
 use esp_wifi::wifi::utils::create_network_interface;
-
-use esp_wifi::wifi_interface::timestamp;
+use esp_wifi::wifi_interface::Network;
 use mqttrust::encoding::v4::Pid;
 
 use smoltcp::wire::Ipv4Address;
 use xtensa_lx_rt::entry;
 
 use crate::bmp180::Bmp180;
-use crate::socket::Network;
 use crate::tiny_mqtt::TinyMqtt;
 
-extern crate alloc;
-
 mod bmp180;
-mod socket;
 mod tiny_mqtt;
 
 const SSID: &str = env!("SSID");
@@ -48,8 +43,12 @@ const INTERVALL_MS: u64 = 1 * 60 * 1000; // 1 minute intervall
 
 #[entry]
 fn main() -> ! {
-    init_logger();
+    // unsafe {
+    //     xtensa_lx::interrupt::disable();
+    // }
+
     esp_wifi::init_heap();
+    init_logger();
 
     let peripherals = Peripherals::take().unwrap();
     let mut system = peripherals.DPORT.split();
@@ -58,9 +57,8 @@ fn main() -> ! {
     let mut rtc_cntl = Rtc::new(peripherals.RTC_CNTL);
     rtc_cntl.rwdt.disable();
 
-    let mut storage = create_network_stack_storage!(3, 8, 1);
+    let mut storage = create_network_stack_storage!(3, 8, 1, 1);
     let network_stack = create_network_interface(network_stack_storage!(storage));
-
     let mut wifi_interface = esp_wifi::wifi_interface::Wifi::new(network_stack);
 
     let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
@@ -77,8 +75,7 @@ fn main() -> ! {
         100u32.kHz(),
         &mut system.peripheral_clock_control,
         &clocks,
-    )
-    .unwrap();
+    );
 
     println!("Measuring");
     let mut bmp180 = Bmp180::new(i2c, sleep_millis);
@@ -92,31 +89,39 @@ fn main() -> ! {
         ..Default::default()
     });
     let res = wifi_interface.set_configuration(&client_config);
-    println!("wifi_connect returned {:?}", res);
+    println!("wifi_set_configuration returned {:?}", res);
+
+    println!("{:?}", wifi_interface.get_capabilities());
+    println!("wifi_connect {:?}", wifi_interface.connect());
 
     // wait to get connected
+    println!("Wait to get connected");
     loop {
-        if let Status(ClientStatus::Started(_), _) = wifi_interface.get_status() {
-            break;
+        let res = wifi_interface.is_connected();
+        match res {
+            Ok(connected) => {
+                if connected {
+                    break;
+                }
+            }
+            Err(err) => {
+                println!("{:?}", err);
+                loop {}
+            }
         }
     }
-    println!("{:?}", wifi_interface.get_status());
+    println!("{:?}", wifi_interface.is_connected());
 
-    // wait to get connected and have an ip
+    // wait for getting an ip address
+    println!("Wait to get an ip address");
+    let network = Network::new(wifi_interface, esp_wifi::current_millis);
     loop {
-        wifi_interface.poll_dhcp().unwrap();
+        network.poll_dhcp().unwrap();
 
-        wifi_interface
-            .network_interface()
-            .poll(timestamp())
-            .unwrap();
+        network.work();
 
-        if let Status(
-            ClientStatus::Started(ClientConnectionStatus::Connected(ClientIpStatus::Done(config))),
-            _,
-        ) = wifi_interface.get_status()
-        {
-            println!("got ip {:?}", config);
+        if network.is_iface_up() {
+            println!("got ip {:?}", network.get_ip_info());
             break;
         }
     }
@@ -124,13 +129,14 @@ fn main() -> ! {
     println!("We are connected!");
     println!("enter busy loop");
 
-    let mut network = Network::new(wifi_interface, current_millis);
-    let mut socket = network.get_socket();
+    let mut rx_buffer = [0u8; 1536];
+    let mut tx_buffer = [0u8; 1536];
+    let mut socket = network.get_socket(&mut rx_buffer, &mut tx_buffer);
     socket
         .open(Ipv4Address::new(52, 54, 163, 195), 1883) // io.adafruit.com
         .unwrap();
 
-    let mut mqtt = TinyMqtt::new("esp32", socket, current_millis, None);
+    let mut mqtt = TinyMqtt::new("esp32", socket, esp_wifi::current_millis, None);
 
     let mut last_sent_millis = 0;
     let mut first_msg_sent = false;
@@ -156,7 +162,8 @@ fn main() -> ! {
 
         println!("Connected to MQTT broker");
 
-        let topic_name = format!("{}/feeds/temperature", ADAFRUIT_IO_USERNAME);
+        let mut topic_name: heapless::String<32> = heapless::String::new();
+        write!(topic_name, "{}/feeds/temperature", ADAFRUIT_IO_USERNAME).ok();
 
         let mut pkt_num = 10;
         loop {
@@ -164,14 +171,16 @@ fn main() -> ! {
                 break;
             }
 
-            if current_millis() > last_sent_millis + INTERVALL_MS || !first_msg_sent {
+            if esp_wifi::current_millis() > last_sent_millis + INTERVALL_MS || !first_msg_sent {
                 first_msg_sent = true;
 
                 bmp180.measure();
                 let temperature: f32 = bmp180.get_temperature();
 
                 println!("...");
-                let msg = format!("{}", temperature);
+
+                let mut msg: heapless::String<32> = heapless::String::new();
+                write!(msg, "{}", temperature).ok();
                 if mqtt
                     .publish_with_pid(
                         Some(Pid::try_from(pkt_num).unwrap()),
@@ -185,7 +194,7 @@ fn main() -> ! {
                 }
 
                 pkt_num += 1;
-                last_sent_millis = current_millis();
+                last_sent_millis = esp_wifi::current_millis();
             }
         }
 
@@ -194,13 +203,9 @@ fn main() -> ! {
     }
 }
 
-pub fn current_millis() -> u64 {
-    esp_wifi::timer::get_systimer_count() * 1_000 / esp_wifi::timer::TICKS_PER_SECOND
-}
-
 pub fn sleep_millis(delay: u32) {
-    let sleep_end = current_millis() + delay as u64;
-    while current_millis() < sleep_end {
+    let sleep_end = esp_wifi::current_millis() + delay as u64;
+    while esp_wifi::current_millis() < sleep_end {
         // wait
     }
 }
