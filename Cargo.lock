@@ -450,9 +450,9 @@ dependencies = [
 
 [[package]]
 name = "mqttrust"
-version = "0.5.2"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba8d5370b6263cfdfb8843cbc7576612dd07cb2d6a600fd6c46e76c5570bf63d"
+checksum = "ae32f7b780d20b0fc574bba0ca71b33838bb264d7a48b098cd18e3327c30edde"
 dependencies = [
  "heapless",
 ]
