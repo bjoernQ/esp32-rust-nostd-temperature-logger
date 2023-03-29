@@ -1,6 +1,6 @@
 use embedded_io::blocking::{Read, Write};
 use esp_println::println;
-use esp_wifi::{compat::queue::SimpleQueue, wifi_interface::WifiError};
+use esp_wifi::{compat::queue::SimpleQueue, wifi::WifiError};
 use mqttrust::{
     encoding::v4::{decode_slice, encode_slice, Connect, Pid, Protocol},
     Mqtt, MqttError, Packet, Publish, QoS, Subscribe, SubscribeTopic,
@@ -10,19 +10,12 @@ use smoltcp::wire::Ipv4Address;
 #[derive(Debug)]
 pub enum TinyMqttError {
     MqttError(MqttError),
-    Error(smoltcp::Error),
     WifiError(WifiError),
 }
 
 impl From<MqttError> for TinyMqttError {
     fn from(e: MqttError) -> Self {
         TinyMqttError::MqttError(e)
-    }
-}
-
-impl From<smoltcp::Error> for TinyMqttError {
-    fn from(e: smoltcp::Error) -> Self {
-        TinyMqttError::Error(e)
     }
 }
 
@@ -145,7 +138,7 @@ impl<'a> TinyMqtt<'a> {
             buf[idx + 1] = (pid & 0xff) as u8;
         }
 
-        self.queue.borrow_mut().enqueue((len, buf));
+        self.queue.borrow_mut().enqueue((len, buf)).unwrap();
         Ok(())
     }
 
@@ -212,7 +205,8 @@ impl<'a> TinyMqtt<'a> {
                 self.recv_index = 0;
                 self.recv_queue
                     .borrow_mut()
-                    .enqueue(PacketBuffer::new(packet));
+                    .enqueue(PacketBuffer::new(packet))
+                    .ok();
             }
 
             if len == 0 {
@@ -243,7 +237,7 @@ impl<'a> Mqtt for TinyMqtt<'a> {
         let mut buf = [0u8; 1024];
         let len = encode_slice(&packet, &mut buf).unwrap();
 
-        self.queue.borrow_mut().enqueue((len, buf));
+        self.queue.borrow_mut().enqueue((len, buf)).ok();
         Ok(())
     }
 

@@ -10,23 +10,22 @@ use embedded_svc::wifi::{ClientConfiguration, Configuration, Wifi};
 use esp32_hal::clock::ClockControl;
 use esp32_hal::clock::CpuClock;
 use esp32_hal::i2c::I2C;
-use esp32_hal::pac::Peripherals;
+use esp32_hal::peripherals::Peripherals;
 use esp32_hal::prelude::_fugit_RateExtU32;
-use esp32_hal::prelude::*;
 use esp32_hal::timer::TimerGroup;
 use esp32_hal::Rtc;
 use esp32_hal::IO;
+use esp32_hal::{prelude::*, Rng};
 use esp_backtrace as _;
 use esp_println::println;
-use esp_wifi::create_network_stack_storage;
-use esp_wifi::initialize;
-use esp_wifi::network_stack_storage;
 use esp_wifi::wifi::utils::create_network_interface;
-use esp_wifi::wifi_interface::Network;
+use esp_wifi::wifi::WifiMode;
+use esp_wifi::wifi_interface::WifiStack;
+use esp_wifi::{current_millis, initialize};
 use mqttrust::encoding::v4::Pid;
 
+use smoltcp::iface::SocketStorage;
 use smoltcp::wire::Ipv4Address;
-use xtensa_lx_rt::entry;
 
 use crate::bmp180::Bmp180;
 use crate::tiny_mqtt::TinyMqtt;
@@ -46,19 +45,27 @@ fn main() -> ! {
     esp_wifi::init_heap();
     init_logger();
 
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = Peripherals::take();
     let mut system = peripherals.DPORT.split();
     let clocks = ClockControl::configure(system.clock_control, CpuClock::Clock240MHz).freeze();
 
     let mut rtc_cntl = Rtc::new(peripherals.RTC_CNTL);
     rtc_cntl.rwdt.disable();
 
-    let mut storage = create_network_stack_storage!(3, 8, 1, 1);
-    let network_stack = create_network_interface(network_stack_storage!(storage));
-    let mut wifi_interface = esp_wifi::wifi_interface::Wifi::new(network_stack);
+    let (wifi, _) = peripherals.RADIO.split();
+    let mut socket_set_entries: [SocketStorage; 3] = Default::default();
+    let (iface, device, mut controller, sockets) =
+        create_network_interface(wifi, WifiMode::Sta, &mut socket_set_entries);
+    let wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
 
     let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-    initialize(timg1.timer0, peripherals.RNG, &clocks).ok();
+    initialize(
+        timg1.timer0,
+        Rng::new(peripherals.RNG),
+        system.radio_clock_control,
+        &clocks,
+    )
+    .ok();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -84,16 +91,13 @@ fn main() -> ! {
         password: PASSWORD.into(),
         ..Default::default()
     });
-    let res = wifi_interface.set_configuration(&client_config);
-    println!("wifi_set_configuration returned {:?}", res);
+    controller.set_configuration(&client_config).unwrap();
+    controller.start().unwrap();
+    controller.connect().unwrap();
 
-    println!("{:?}", wifi_interface.get_capabilities());
-    println!("wifi_connect {:?}", wifi_interface.connect());
-
-    // wait to get connected
     println!("Wait to get connected");
     loop {
-        let res = wifi_interface.is_connected();
+        let res = controller.is_connected();
         match res {
             Ok(connected) => {
                 if connected {
@@ -106,18 +110,14 @@ fn main() -> ! {
             }
         }
     }
-    println!("{:?}", wifi_interface.is_connected());
 
     // wait for getting an ip address
     println!("Wait to get an ip address");
-    let network = Network::new(wifi_interface, esp_wifi::current_millis);
     loop {
-        network.poll_dhcp().unwrap();
+        wifi_stack.work();
 
-        network.work();
-
-        if network.is_iface_up() {
-            println!("got ip {:?}", network.get_ip_info());
+        if wifi_stack.is_iface_up() {
+            println!("Got ip {:?}", wifi_stack.get_ip_info());
             break;
         }
     }
@@ -127,7 +127,7 @@ fn main() -> ! {
 
     let mut rx_buffer = [0u8; 1536];
     let mut tx_buffer = [0u8; 1536];
-    let mut socket = network.get_socket(&mut rx_buffer, &mut tx_buffer);
+    let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
     socket
         .open(Ipv4Address::new(52, 54, 163, 195), 1883) // io.adafruit.com
         .unwrap();
