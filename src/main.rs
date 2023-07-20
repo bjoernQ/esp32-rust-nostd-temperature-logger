@@ -21,11 +21,11 @@ use esp_println::println;
 use esp_wifi::wifi::utils::create_network_interface;
 use esp_wifi::wifi::WifiMode;
 use esp_wifi::wifi_interface::WifiStack;
-use esp_wifi::{current_millis, initialize};
+use esp_wifi::{current_millis, initialize, EspWifiInitFor};
 use mqttrust::encoding::v4::Pid;
 
 use smoltcp::iface::SocketStorage;
-use smoltcp::wire::Ipv4Address;
+use smoltcp::wire::{IpAddress, Ipv4Address};
 
 use crate::bmp180::Bmp180;
 use crate::tiny_mqtt::TinyMqtt;
@@ -42,30 +42,31 @@ const INTERVALL_MS: u64 = 1 * 60 * 1000; // 1 minute intervall
 
 #[entry]
 fn main() -> ! {
-    esp_wifi::init_heap();
-    init_logger();
+    esp_println::logger::init_logger_from_env();
 
     let peripherals = Peripherals::take();
-    let mut system = peripherals.DPORT.split();
+    let system = peripherals.DPORT.split();
     let clocks = ClockControl::configure(system.clock_control, CpuClock::Clock240MHz).freeze();
+    let mut peripheral_clock_control = system.peripheral_clock_control;
 
     let mut rtc_cntl = Rtc::new(peripherals.RTC_CNTL);
     rtc_cntl.rwdt.disable();
 
     let (wifi, _) = peripherals.RADIO.split();
-    let mut socket_set_entries: [SocketStorage; 3] = Default::default();
-    let (iface, device, mut controller, sockets) =
-        create_network_interface(wifi, WifiMode::Sta, &mut socket_set_entries);
-    let wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
-
-    let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-    initialize(
+    let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks, &mut peripheral_clock_control);
+    let init = initialize(
+        EspWifiInitFor::Wifi,
         timg1.timer0,
         Rng::new(peripherals.RNG),
         system.radio_clock_control,
         &clocks,
     )
-    .ok();
+    .unwrap();
+
+    let mut socket_set_entries: [SocketStorage; 3] = Default::default();
+    let (iface, device, mut controller, sockets) =
+        create_network_interface(&init, wifi, WifiMode::Sta, &mut socket_set_entries);
+    let wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -76,7 +77,7 @@ fn main() -> ! {
         io.pins.gpio32,
         io.pins.gpio33,
         100u32.kHz(),
-        &mut system.peripheral_clock_control,
+        &mut peripheral_clock_control,
         &clocks,
     );
 
@@ -129,7 +130,7 @@ fn main() -> ! {
     let mut tx_buffer = [0u8; 1536];
     let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
     socket
-        .open(Ipv4Address::new(52, 54, 163, 195), 1883) // io.adafruit.com
+        .open(IpAddress::Ipv4(Ipv4Address::new(52, 54, 163, 195)), 1883) // io.adafruit.com
         .unwrap();
 
     let mut mqtt = TinyMqtt::new("esp32", socket, esp_wifi::current_millis, None);
@@ -141,7 +142,7 @@ fn main() -> ! {
         println!("Trying to connect");
         mqtt.disconnect().ok();
         if let Err(e) = mqtt.connect(
-            Ipv4Address::new(52, 54, 163, 195), // io.adafruit.com
+            IpAddress::Ipv4(Ipv4Address::new(52, 54, 163, 195)), // io.adafruit.com
             1883,
             10,
             Some(ADAFRUIT_IO_USERNAME),
@@ -204,26 +205,4 @@ pub fn sleep_millis(delay: u32) {
     while esp_wifi::current_millis() < sleep_end {
         // wait
     }
-}
-
-pub fn init_logger() {
-    unsafe {
-        log::set_logger_racy(&LOGGER).unwrap();
-        log::set_max_level(log::LevelFilter::Info);
-    }
-}
-
-static LOGGER: SimpleLogger = SimpleLogger;
-struct SimpleLogger;
-
-impl log::Log for SimpleLogger {
-    fn enabled(&self, _metadata: &log::Metadata) -> bool {
-        true
-    }
-
-    fn log(&self, record: &log::Record) {
-        println!("{} - {}", record.level(), record.args());
-    }
-
-    fn flush(&self) {}
 }

@@ -5,7 +5,7 @@ use mqttrust::{
     encoding::v4::{decode_slice, encode_slice, Connect, Pid, Protocol},
     Mqtt, MqttError, Packet, Publish, QoS, Subscribe, SubscribeTopic,
 };
-use smoltcp::wire::Ipv4Address;
+use smoltcp::wire::IpAddress;
 
 #[derive(Debug)]
 pub enum TinyMqttError {
@@ -81,7 +81,7 @@ impl<'a> TinyMqtt<'a> {
 
     pub fn connect(
         &mut self,
-        addr: Ipv4Address,
+        addr: IpAddress,
         port: u16,
         keep_alive_secs: u16,
         username: Option<&'a str>,

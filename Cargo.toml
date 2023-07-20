@@ -9,16 +9,16 @@ license = "MIT OR Apache-2.0"
 opt-level = "s"
 
 [dependencies]
-esp32-hal = "0.11.0"
+esp32-hal = "0.13.0"
 
-esp-wifi = { git = "https://github.com/esp-rs/esp-wifi.git", features = ["esp32", "embedded-svc", "wifi"], rev = "74e9f182ddd3c978b7ad4e86801da0811c4d1aa5" }
-smoltcp = { version = "0.9.1", default-features=false, features = ["proto-igmp", "proto-ipv4", "socket-tcp", "socket-icmp", "socket-udp", "medium-ethernet", "proto-dhcpv4", "socket-raw", "socket-dhcpv4"] }
-embedded-svc = { version = "0.23.2", default-features = false }
+esp-wifi = { git = "https://github.com/esp-rs/esp-wifi.git", features = ["esp32", "embedded-svc", "wifi"], rev = "37dd9ed7ae07a86f7afaef34fa4cbb48ad41b210" }
+smoltcp = { version = "0.10.0", default-features=false, features = ["proto-igmp", "proto-ipv4", "socket-tcp", "socket-icmp", "socket-udp", "medium-ethernet", "proto-dhcpv4", "socket-raw", "socket-dhcpv4"] }
+embedded-svc = { version = "0.25.3", default-features = false }
 mqttrust = "0.6.0"
 log = "0.4.16"
 nb = "1.0.0"
 embedded-hal = "0.2"
-esp-println = { version = "0.4.0", features = [ "esp32", "uart" ] }
-esp-backtrace = { version = "0.6.0", features = [ "esp32", "panic-handler", "print-uart" ] }
+esp-println = { version = "0.5.0", features = [ "esp32", "uart", "log" ] }
+esp-backtrace = { version = "0.7.0", features = [ "esp32", "panic-handler", "print-uart" ] }
 embedded-io = "0.4.0"
 heapless = "0.7.16"
