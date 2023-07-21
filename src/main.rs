@@ -38,7 +38,7 @@ const PASSWORD: &str = env!("PASSWORD");
 const ADAFRUIT_IO_USERNAME: &str = env!("ADAFRUIT_IO_USERNAME");
 const ADAFRUIT_IO_KEY: &str = env!("ADAFRUIT_IO_KEY");
 
-const INTERVALL_MS: u64 = 1 * 60 * 1000; // 1 minute intervall
+const INTERVAL_MS: u64 = 1 * 60 * 1000; // 1 minute interval
 
 #[entry]
 fn main() -> ! {
@@ -168,7 +168,7 @@ fn main() -> ! {
                 break;
             }
 
-            if esp_wifi::current_millis() > last_sent_millis + INTERVALL_MS || !first_msg_sent {
+            if esp_wifi::current_millis() > last_sent_millis + INTERVAL_MS || !first_msg_sent {
                 first_msg_sent = true;
 
                 bmp180.measure();
